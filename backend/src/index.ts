@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import { config } from './config/index.js';
+import walletRoutes from './routes/wallet.routes.js';
 
 const app = express();
 
@@ -34,10 +35,8 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Routes will be added here
-// app.use('/api/auth', authRoutes);
-// app.use('/api/wallet', walletRoutes);
-// app.use('/api/orders', orderRoutes);
+// API Routes
+app.use('/api/wallet', walletRoutes);
 
 // Error handling middleware
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
