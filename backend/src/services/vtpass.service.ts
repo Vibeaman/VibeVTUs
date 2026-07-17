@@ -2,21 +2,35 @@
  * VTPass Service
  * Handles all communication with VTPass API for airtime and data purchases
  * 
- * API Base URL: https://sandbox.vtpass.com/api (use live URL for production)
+ * API Documentation: https://vtpass.com/developers
+ * 
+ * Sandbox Test Phone Numbers for Airtime:
+ * - 08011111111 → Success
+ * - 201000000000 → Pending
+ * - 400000000000 → No Response
+ * - 300000000000 → Timeout
+ * - Any other number → Failed
  */
 
-import crypto from 'crypto';
+
 import { config } from '../config/index.js';
 
 export type Network = 'mtn' | 'airtel' | 'glo' | '9mobile';
 export type TransactionStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
 interface VTPassResponse {
+  code: string;
   response_description: string;
-  response_code: string;
   requestId?: string;
-  content?: any;
-  transactions?: any;
+  content?: {
+    transactions?: {
+      status: string;
+      product_name: string;
+      phone: string;
+      amount: string;
+    };
+    variations?: any[];
+  };
 }
 
 interface PurchaseResult {
@@ -25,6 +39,7 @@ interface PurchaseResult {
   error?: string;
   errorCode?: string;
   rawResponse?: any;
+  transactionStatus?: string;
 }
 
 interface AirtimePurchaseParams {
@@ -49,13 +64,6 @@ function getBaseUrl(): string {
 }
 
 /**
- * Generate VTPass request ID
- */
-function generateVTPassRequestId(): string {
-  return `VTP_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
-}
-
-/**
  * Make authenticated request to VTPass API
  */
 async function vtpassRequest(
@@ -64,7 +72,7 @@ async function vtpassRequest(
 ): Promise<VTPassResponse> {
   const baseUrl = getBaseUrl();
   const url = `${baseUrl}${endpoint}`;
-  const requestId = generateVTPassRequestId();
+  const requestId = payload.request_id || `VTP_${Date.now()}`;
 
   const authParams = `${config.vtpass.email}:${config.vtpass.apiKey}`;
   const authToken = Buffer.from(authParams).toString('base64');
@@ -79,76 +87,67 @@ async function vtpassRequest(
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Basic ${authToken}`,
-        'public-key': config.vtpass.publicKey || '',
       },
-      body: JSON.stringify({
-        request_id: requestId,
-        ...payload,
-      }),
+      body: JSON.stringify(payload),
     });
 
     const data = await response.json();
 
-    console.log(`[VTPass] ${requestId} - Response:`, data);
+    console.log(`[VTPass] ${requestId} - Response:`, JSON.stringify(data, null, 2));
 
     return data as VTPassResponse;
   } catch (error: any) {
     console.error(`[VTPass] ${requestId} - Network Error:`, error.message);
     return {
-      response_description: 'NETWORK_ERROR',
-      response_code: '96',
+      code: '96',
+      response_description: 'NETWORK_ERROR: ' + error.message,
     };
   }
 }
 
 /**
  * Purchase Airtime via VTPass
+ * 
+ * Response codes:
+ * - 000 = Success (delivered)
+ * - 099 = Pending/Processing
+ * - Other = Failed
  */
 export async function purchaseAirtime(params: AirtimePurchaseParams): Promise<PurchaseResult> {
   const { network, phoneNumber, amount, reference } = params;
 
   // Map our network names to VTPass codes
   const networkCodes: Record<Network, string> = {
-    mtn: 'MTN',
-    airtel: 'AIRTEL',
-    glo: 'GLO',
-    '9mobile': 'ETISALAT', // VTPass uses ETISALAT for 9mobile
+    mtn: 'mtn',
+    airtel: 'airtel',
+    glo: 'glo',
+    '9mobile': 'etisalat',
   };
 
   const response = await vtpassRequest('/pay', {
-    serviceID: networkCodes[network],
-    amount: amount.toString(),
-    phone: phoneNumber,
     request_id: reference,
+    serviceID: networkCodes[network],
+    amount: amount,
+    phone: phoneNumber,
   });
 
-  // VTPass response codes:
-  // 000 = Success
-  // 099 = Pending/Processing
-  // Others = Failed
-
-  if (response.response_code === '000') {
+  // Check response code
+  if (response.code === '000') {
     return {
       success: true,
-      requestId: response.requestId,
+      requestId: reference,
+      transactionStatus: response.content?.transactions?.status || 'delivered',
       rawResponse: response,
     };
   }
 
-  // Check if it's a processing/pending status
-  if (response.response_code === '099') {
-    // For sandbox, treat pending as success (simulated instant delivery)
-    if (config.nodeEnv !== 'production') {
-      return {
-        success: true,
-        requestId: response.requestId,
-        rawResponse: response,
-      };
-    }
+  // Pending status
+  if (response.code === '099') {
     return {
       success: false,
-      error: 'Transaction is processing. Please check status later.',
-      errorCode: response.response_code,
+      error: 'Transaction is pending. Please check status later.',
+      errorCode: 'PENDING',
+      requestId: reference,
       rawResponse: response,
     };
   }
@@ -156,7 +155,7 @@ export async function purchaseAirtime(params: AirtimePurchaseParams): Promise<Pu
   return {
     success: false,
     error: response.response_description || 'Airtime purchase failed',
-    errorCode: response.response_code,
+    errorCode: response.code,
     rawResponse: response,
   };
 }
@@ -167,43 +166,36 @@ export async function purchaseAirtime(params: AirtimePurchaseParams): Promise<Pu
 export async function purchaseData(params: DataPurchaseParams): Promise<PurchaseResult> {
   const { network, phoneNumber, dataPlan, reference } = params;
 
-  // Map our network names to VTPass codes
   const networkCodes: Record<Network, string> = {
-    mtn: 'MTN',
-    airtel: 'AIRTEL',
-    glo: 'GLO',
-    '9mobile': 'ETISALAT',
+    mtn: 'mtn',
+    airtel: 'airtel',
+    glo: 'glo',
+    '9mobile': 'etisalat',
   };
 
   const response = await vtpassRequest('/pay', {
+    request_id: reference,
     serviceID: networkCodes[network],
     billersCode: phoneNumber,
     variation_code: dataPlan,
-    amount: '', // VTPass gets amount from variation_code
     phone: phoneNumber,
-    request_id: reference,
   });
 
-  if (response.response_code === '000') {
+  if (response.code === '000') {
     return {
       success: true,
-      requestId: response.requestId,
+      requestId: reference,
+      transactionStatus: response.content?.transactions?.status || 'delivered',
       rawResponse: response,
     };
   }
 
-  if (response.response_code === '099') {
-    if (config.nodeEnv !== 'production') {
-      return {
-        success: true,
-        requestId: response.requestId,
-        rawResponse: response,
-      };
-    }
+  if (response.code === '099') {
     return {
       success: false,
-      error: 'Transaction is processing. Please check status later.',
-      errorCode: response.response_code,
+      error: 'Transaction is pending. Please check status later.',
+      errorCode: 'PENDING',
+      requestId: reference,
       rawResponse: response,
     };
   }
@@ -211,7 +203,7 @@ export async function purchaseData(params: DataPurchaseParams): Promise<Purchase
   return {
     success: false,
     error: response.response_description || 'Data purchase failed',
-    errorCode: response.response_code,
+    errorCode: response.code,
     rawResponse: response,
   };
 }
@@ -228,11 +220,12 @@ export async function checkTransactionStatus(requestId: string): Promise<{
     request_id: requestId,
   });
 
-  if (response.response_code === '000') {
+  if (response.code === '000') {
+    const txStatus = response.content?.transactions?.status;
     return {
       success: true,
-      status: 'completed',
-      data: response.transactions,
+      status: txStatus === 'delivered' ? 'completed' : 'pending',
+      data: response.content?.transactions,
     };
   }
 
@@ -247,17 +240,17 @@ export async function checkTransactionStatus(requestId: string): Promise<{
  */
 export async function getDataPlans(network: Network): Promise<any[]> {
   const networkCodes: Record<Network, string> = {
-    mtn: 'MTN',
-    airtel: 'AIRTEL',
-    glo: 'GLO',
-    '9mobile': 'ETISALAT',
+    mtn: 'mtn',
+    airtel: 'airtel',
+    glo: 'glo',
+    '9mobile': 'etisalat',
   };
 
-  const response = await vtpassRequest('/varations', {
+  const response = await vtpassRequest('/service-variations', {
     serviceID: networkCodes[network],
   });
 
-  if (response.response_code === '000') {
+  if (response.code === '000') {
     return response.content?.variations || [];
   }
 
