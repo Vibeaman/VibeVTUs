@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import { config } from './config/index.js';
+import authRoutes from './routes/auth.routes.js';
 import walletRoutes from './routes/wallet.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
 import vtuRoutes from './routes/vtu.routes.js';
@@ -45,6 +46,7 @@ app.get('/health', (_req, res) => {
 });
 
 // API Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/vtu', vtuRoutes);

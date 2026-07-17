@@ -5,19 +5,16 @@ import {
   handleGetNetworks,
   handleGetDataPlans,
 } from '../controllers/vtu.controller.js';
+import { authenticate } from '../middleware/auth.middleware.js';
 
 const router = Router();
 
-// POST /api/vtu/airtime - Purchase airtime
-router.post('/airtime', handlePurchaseAirtime);
-
-// POST /api/vtu/data - Purchase data bundle
-router.post('/data', handlePurchaseData);
-
-// GET /api/vtu/networks - Get available networks
+// Public routes (no auth needed for viewing networks/plans)
 router.get('/networks', handleGetNetworks);
-
-// GET /api/vtu/data-plans/:network - Get data plans for a network
 router.get('/data-plans/:network', handleGetDataPlans);
+
+// Protected routes (auth required for purchases)
+router.post('/airtime', authenticate, handlePurchaseAirtime);
+router.post('/data', authenticate, handlePurchaseData);
 
 export default router;
