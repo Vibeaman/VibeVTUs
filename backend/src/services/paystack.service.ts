@@ -1,13 +1,6 @@
 import crypto from 'crypto';
 import { config } from '../config/index.js';
 
-interface PaystackCustomer {
-  email: string;
-  first_name?: string;
-  last_name?: string;
-  phone?: string;
-}
-
 interface PaystackMetadata {
   userId: string;
   type: 'wallet_funding';

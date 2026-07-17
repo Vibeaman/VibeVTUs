@@ -1,21 +1,9 @@
 import { supabaseAdmin } from '../config/supabase.js';
-import { Database } from '../types/database.js';
 import { v4 as uuidv4 } from 'uuid';
-
-type Wallet = Database['public']['Tables']['wallets']['Row'];
-type Transaction = Database['public']['Tables']['transactions']['Row'];
-type TransactionType = Database['public']['Tables']['transactions']['Insert']['type'];
-type TransactionStatus = Database['public']['Tables']['transactions']['Insert']['status'];
 
 interface WalletResult {
   success: boolean;
-  data?: Wallet;
-  error?: string;
-}
-
-interface TransactionResult {
-  success: boolean;
-  data?: Transaction;
+  data?: { balance: number; user_id: string };
   error?: string;
 }
 
@@ -27,7 +15,7 @@ interface BalanceResult {
 
 interface HistoryResult {
   success: boolean;
-  data?: Transaction[];
+  data?: any[];
   error?: string;
 }
 

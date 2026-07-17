@@ -45,8 +45,8 @@ describe('Wallet Service', () => {
       email_confirm: true,
     });
 
-    testUserId = user1?.id || '';
-    testUserId2 = user2?.id || '';
+    testUserId = user1?.user?.id || '';
+    testUserId2 = user2?.user?.id || '';
 
     // Ensure wallets exist
     await supabase.from('wallets').upsert({ user_id: testUserId, balance: 1000 });
@@ -82,7 +82,7 @@ describe('Wallet Service', () => {
       const debitAmount = 1500; // More than balance
 
       // Attempt to debit
-      const { data, error } = await supabase.rpc('atomic_debit_wallet', {
+      const { error } = await supabase.rpc('atomic_debit_wallet', {
         p_user_id: testUserId,
         p_amount: debitAmount,
         p_reference: `TEST_REJECT_${Date.now()}`,
@@ -433,12 +433,6 @@ describe('Wallet Service', () => {
       expect(error2).not.toBeNull();
 
       // Balance should only be credited once
-      const { data: wallet } = await supabase
-        .from('wallets')
-        .select('balance')
-        .eq('user_id', testUserId)
-        .single();
-      
       // Should only have one credit of 100, not 200
       const { data: txCount } = await supabase
         .from('transactions')

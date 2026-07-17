@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { config } from './index';
 
-export const supabase = createClient(
+// Admin client for server-side operations (bypasses RLS)
+export const supabaseAdmin = createClient(
   config.supabase.url,
   config.supabase.serviceKey,
   {
