@@ -6,6 +6,7 @@ import rateLimit from 'express-rate-limit';
 import { config } from './config/index.js';
 import walletRoutes from './routes/wallet.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
+import vtuRoutes from './routes/vtu.routes.js';
 
 const app = express();
 
@@ -46,6 +47,7 @@ app.get('/health', (_req, res) => {
 // API Routes
 app.use('/api/wallet', walletRoutes);
 app.use('/api/payment', paymentRoutes);
+app.use('/api/vtu', vtuRoutes);
 
 // Error handling middleware
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

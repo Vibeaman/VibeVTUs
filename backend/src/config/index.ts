@@ -18,6 +18,12 @@ export const config = {
     callbackUrl: process.env.PAYSTACK_CALLBACK_URL || 'http://localhost:3000/wallet',
   },
 
+  vtpass: {
+    email: process.env.VTPASS_EMAIL!,
+    apiKey: process.env.VTPASS_API_KEY!,
+    publicKey: process.env.VTPASS_PUBLIC_KEY,
+  },
+
   cors: {
     origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
   },
