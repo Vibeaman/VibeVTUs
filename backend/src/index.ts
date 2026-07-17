@@ -5,6 +5,7 @@ import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import { config } from './config/index.js';
 import walletRoutes from './routes/wallet.routes.js';
+import paymentRoutes from './routes/payment.routes.js';
 
 const app = express();
 
@@ -26,7 +27,14 @@ app.use(cors({
   credentials: true,
 }));
 
-// Body parsing
+// Raw body parser for Paystack webhook signature verification
+// IMPORTANT: This must come BEFORE express.json()
+app.use('/api/payment/webhook', express.raw({ type: 'application/json' }), (req, _res, next) => {
+  (req as any).rawBody = req.body;
+  next();
+});
+
+// Body parsing for other routes
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -37,6 +45,7 @@ app.get('/health', (_req, res) => {
 
 // API Routes
 app.use('/api/wallet', walletRoutes);
+app.use('/api/payment', paymentRoutes);
 
 // Error handling middleware
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
